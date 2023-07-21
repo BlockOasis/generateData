@@ -13,26 +13,14 @@ const brokerIp = args[0];
 const port = parseInt(args[1]);
 const topic = args[2];
 
+const maxFileSizeBytes = 5000; // 10 KB (adjust as needed)
+
+let receivedData = ''; // Variable to store received data as a CSV string
+let isFirstLine = true; // Flag to indicate if it's the first line of the received data
+
 // Create a write stream to log outputs to stderr.log
 const logFilePath = path.join(__dirname, '../logfiles/', 'stderrListener.log');
 const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
-
-// Create a write stream to write received messages directly to received.csv
-const receivedFilePath = path.join(__dirname, '../receivedFiles',  '/received.csv');
-const receivedStream = fs.createWriteStream(receivedFilePath, { flags: 'a' });
-
-// Function to check if the received.csv file is empty
-function isFileEmpty(filePath) {
-  try {
-    const stats = fs.statSync(filePath);
-    return stats.size === 0;
-  } catch (err) {
-    return true; // File doesn't exist or an error occurred while accessing it
-  }
-}
-
-// Flag to track if the received.csv file is empty
-let isFirstLine = isFileEmpty(receivedFilePath);
 
 // Function to convert a JavaScript object to a CSV string
 function convertToCsv(dataObject) {
@@ -65,23 +53,42 @@ client.on('message', (topic, message) => {
     // Convert the message to a CSV string
     const csvString = convertToCsv(jsonMessage);
 
-    // Check if the received.csv file is empty and add attribute names as the first line
-    if (isFirstLine) {
-      const attributeNames = Object.keys(jsonMessage);
-      receivedStream.write(attributeNames.join(',') + '\n', (err) => {
+    // Log the current state before updating receivedData
+    logStream.write(`Current state before update:\n${receivedData}\n`);
+
+    // Check if appending the CSV string would exceed the maximum file size
+    const totalSize = receivedData.length + csvString.length;
+    if (totalSize >= maxFileSizeBytes) {
+      // Save the current receivedData as a chunk file with timestamp in the name
+      const timestamp = Date.now();
+      const chunkFileName = `chunk-${timestamp}.csv`;
+      const chunkFilePath = path.join(__dirname, '../receivedFiles', chunkFileName);
+
+      fs.writeFileSync(chunkFilePath, receivedData, (err) => {
         if (err) {
-          logStream.write(`Error saving attribute names: ${err}\n`);
+          logStream.write(`Error saving chunk file: ${err}\n`);
         }
       });
+
+      // Reset isFirstLine flag to true to start writing attribute names in the new file
+      isFirstLine = true;
+
+      // Clear receivedData to start receiving new data in the variable
+      receivedData = '';
+    }
+
+    // Add attribute names as the first line if it's the beginning of the data
+    if (isFirstLine) {
+      const attributeNames = Object.keys(jsonMessage);
+      receivedData += attributeNames.join(',') + '\n';
       isFirstLine = false;
     }
 
-    // Write the CSV string directly to received.csv
-    receivedStream.write(csvString, (err) => {
-      if (err) {
-        logStream.write(`Error saving received CSV: ${err}\n`);
-      }
-    });
+    // Append the CSV string to receivedData
+    receivedData += csvString;
+
+    // Log the current state after updating receivedData
+    logStream.write(`Current state after update:\n${receivedData}\n`);
   } catch (err) {
     logStream.write(`Error processing MQTT message: ${err}\n`);
   }
@@ -95,6 +102,22 @@ client.on('error', (err) => {
 // Handle MQTT disconnect
 client.on('close', () => {
   logStream.write('Disconnected from MQTT broker\n');
-  receivedStream.end(); // Close the received stream when the script is finished
-  logStream.end(); // Close the log stream when the script is finished
+
+  // If there's any remaining data in receivedData, save it as the final chunk
+  if (receivedData.length > 0) {
+    const timestamp = Date.now();
+    const chunkFileName = `chunk-${timestamp}.csv`;
+    const chunkFilePath = path.join(__dirname, '../receivedFiles', chunkFileName);
+
+    fs.writeFileSync(chunkFilePath, receivedData, (err) => {
+      if (err) {
+        logStream.write(`Error saving chunk file: ${err}\n`);
+      }
+    });
+  }
+
+  // Close the script gracefully
+  receivedStream.end();
+  logStream.end();
+  process.exit(0);
 });
