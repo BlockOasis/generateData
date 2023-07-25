@@ -22,15 +22,13 @@ Before using this system, ensure you have the following installed on your machin
 To use this system, you need to set up an MQTT broker. For this purpose, we recommend using EMQ X Broker, which is an open-source MQTT broker. Follow these steps to start the MQTT broker:
 
 **Step 1:** For the first time, use the following command to run the EMQ X Broker in a Docker container:
-
-    ```bash
-    sudo docker run -d --name emqx -p 1888:1883 -p 8083:8083 -p 8084:8084 -p 8883:8883 -p 18083:18083 emqx/emqx
-    ```
+```bash
+sudo docker run -d --name emqx -p 1888:1883 -p 8083:8083 -p 8084:8084 -p 8883:8883 -p 18083:18083 emqx/emqx
+```
 **Step 2:** Once the container is created, you can start it using the following command:
-
-    ```bash
-    sudo docker start emqx
-    ```
+```bash
+sudo docker start emqx
+```
 
 ## Sending Data
 To send data to the MQTT broker, use the `mqttSender.js` script. It reads data from a CSV file and sends each row as a JSON message to the specified MQTT topic. Follow the steps below to send data:
@@ -39,9 +37,9 @@ To send data to the MQTT broker, use the `mqttSender.js` script. It reads data f
 
 **Step 2:** Open a terminal, navigate to the root directory of this repository, and execute the following command:
 
-    ```bash
-    node mqttSender.js <broker_ip> <port> <topic> <csv_file_path>
-    ```
+```bash
+node mqttSender.js <broker_ip> <port> <topic> <csv_file_path>
+```
 
 Replace the placeholders with the following:
 
@@ -59,9 +57,9 @@ To listen and receive data from the MQTT broker, use the mqttListener.js script.
 
 **Step 2:** Open a new terminal, navigate to the root directory of this repository, and execute the following command:
 
-    ```bash
-    node mqttListener.js <broker_ip> <port> <topic>
-    ```
+```bash
+node mqttListener.js <broker_ip> <port> <topic>
+```
 Replace the placeholders with the following:
 
 * `<broker_ip>`: The IP address of the MQTT broker. If running locally on the same machine, use localhost.
